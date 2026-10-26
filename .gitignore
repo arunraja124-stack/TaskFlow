@@ -9,3 +9,14 @@ htmlcov/
 .DS_Store
 .vscode/
 instance/
+*.log
+*.sqlite
+*.sqlite3
+*.db
+*.pem
+*.key
+*.crt
+.mypy_cache/
+.ruff_cache/
+build/
+dist/

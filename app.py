@@ -3,6 +3,10 @@ from flask_cors import CORS
 
 from config import Config
 from backend.routes.tasks import tasks_bp
+from backend.routes.auth import auth_bp
+from backend.routes.analytics import analytics_bp
+from backend.routes.ai import ai_bp
+from backend.routes.productivity import productivity_bp
 
 
 def create_app(test_config=None):
@@ -13,6 +17,10 @@ def create_app(test_config=None):
 
     CORS(app, resources={r"/api/*": {"origins": app.config["FRONTEND_ORIGIN"]}})
     app.register_blueprint(tasks_bp, url_prefix="/api")
+    app.register_blueprint(auth_bp, url_prefix="/api/auth")
+    app.register_blueprint(analytics_bp, url_prefix="/api")
+    app.register_blueprint(ai_bp, url_prefix="/api")
+    app.register_blueprint(productivity_bp, url_prefix="/api")
 
     @app.get("/")
     def index():

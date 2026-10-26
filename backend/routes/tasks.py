@@ -1,13 +1,22 @@
 from datetime import date, datetime
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify, request, session
 from mysql.connector import Error
 
 from backend.db import get_connection
+from backend.activity import record_activity
+from backend.security import login_required, require_csrf
 
 tasks_bp = Blueprint("tasks", __name__)
 VALID_STATUSES = {"todo", "in_progress", "completed"}
 VALID_PRIORITIES = {"low", "medium", "high"}
+
+
+def log_activity(action, task_id, details=""):
+    try:
+        record_activity(session["user_id"], task_id, action, details)
+    except Error:
+        current_app.logger.warning("Unable to record task activity", exc_info=True)
 
 
 def response(data=None, message=None, status=200):
@@ -43,9 +52,8 @@ def parse_payload(payload, partial=False):
         if len(title) > 160:
             return None, "Title must be 160 characters or fewer."
         payload["title"] = title
-    if "description" in payload:
-        if not isinstance(payload["description"], str) or len(payload["description"]) > 2000:
-            return None, "Description must be 2000 characters or fewer."
+    if "description" in payload and (not isinstance(payload["description"], str) or len(payload["description"]) > 2000):
+        return None, "Description must be 2000 characters or fewer."
     if "priority" in payload and payload["priority"] not in VALID_PRIORITIES:
         return None, "Priority must be low, medium, or high."
     if "status" in payload and payload["status"] not in VALID_STATUSES:
@@ -66,6 +74,7 @@ def health():
 
 
 @tasks_bp.get("/tasks")
+@login_required
 def list_tasks():
     query = request.args.get("search", "").strip()
     status = request.args.get("status", "").strip()
@@ -78,7 +87,7 @@ def list_tasks():
         return response(message="Invalid priority filter.", status=400)
     order_column = sort_columns.get(sort, "created_at")
     order = "FIELD(priority, 'high', 'medium', 'low'), created_at DESC" if sort == "priority" else f"{order_column} ASC"
-    clauses, values = [], []
+    clauses, values = ["user_id = %s"], [session["user_id"]]
     if query:
         clauses.append("title LIKE %s")
         values.append(f"%{query}%")
@@ -88,8 +97,7 @@ def list_tasks():
     if priority:
         clauses.append("priority = %s")
         values.append(priority)
-    where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
-    sql = f"SELECT id, title, description, status, priority, due_date, created_at, updated_at FROM tasks{where} ORDER BY {order}"
+    sql = f"SELECT id, title, description, status, priority, due_date, created_at, updated_at FROM tasks WHERE {' AND '.join(clauses)} ORDER BY {order}"
     try:
         with get_connection() as connection:
             cursor = connection.cursor(dictionary=True)
@@ -103,6 +111,8 @@ def list_tasks():
 
 
 @tasks_bp.post("/tasks")
+@login_required
+@require_csrf
 def create_task():
     payload, error = parse_payload(request.get_json(silent=True) or {})
     if error:
@@ -114,12 +124,13 @@ def create_task():
         with get_connection() as connection:
             cursor = connection.cursor()
             cursor.execute(
-                "INSERT INTO tasks (title, description, priority, status, due_date) VALUES (%s, %s, %s, %s, %s)",
-                (payload["title"], payload["description"], payload["priority"], payload["status"], payload.get("due_date") or None),
+                "INSERT INTO tasks (user_id, title, description, priority, status, due_date) VALUES (%s, %s, %s, %s, %s, %s)",
+                (session["user_id"], payload["title"], payload["description"], payload["priority"], payload["status"], payload.get("due_date") or None),
             )
             connection.commit()
             task_id = cursor.lastrowid
             cursor.close()
+        log_activity("created", task_id, payload["title"])
         return response({"id": task_id}, "Task created.", 201)
     except Error:
         current_app.logger.exception("Unable to create task")
@@ -129,13 +140,14 @@ def create_task():
 def get_task(task_id):
     with get_connection() as connection:
         cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT id, title, description, status, priority, due_date, created_at, updated_at FROM tasks WHERE id = %s", (task_id,))
+        cursor.execute("SELECT id, title, description, status, priority, due_date, created_at, updated_at FROM tasks WHERE id = %s AND user_id = %s", (task_id, session["user_id"]))
         task = cursor.fetchone()
         cursor.close()
     return serialize_task(task) if task else None
 
 
 @tasks_bp.get("/tasks/<int:task_id>")
+@login_required
 def read_task(task_id):
     try:
         task = get_task(task_id)
@@ -146,6 +158,8 @@ def read_task(task_id):
 
 
 @tasks_bp.put("/tasks/<int:task_id>")
+@login_required
+@require_csrf
 def update_task(task_id):
     payload, error = parse_payload(request.get_json(silent=True) or {}, partial=True)
     if error:
@@ -158,12 +172,13 @@ def update_task(task_id):
     try:
         with get_connection() as connection:
             cursor = connection.cursor()
-            cursor.execute(f"UPDATE tasks SET {assignments} WHERE id = %s", (*values, task_id))
+            cursor.execute(f"UPDATE tasks SET {assignments} WHERE id = %s AND user_id = %s", (*values, task_id, session["user_id"]))
             if cursor.rowcount == 0:
                 cursor.close()
                 return response(message="Task not found.", status=404)
             connection.commit()
             cursor.close()
+        log_activity("updated", task_id, ", ".join(fields))
         return response(message="Task updated.")
     except Error:
         current_app.logger.exception("Unable to update task")
@@ -171,6 +186,8 @@ def update_task(task_id):
 
 
 @tasks_bp.patch("/tasks/<int:task_id>/status")
+@login_required
+@require_csrf
 def update_status(task_id):
     payload = request.get_json(silent=True) or {}
     if payload.get("status") not in VALID_STATUSES:
@@ -178,12 +195,13 @@ def update_status(task_id):
     try:
         with get_connection() as connection:
             cursor = connection.cursor()
-            cursor.execute("UPDATE tasks SET status = %s WHERE id = %s", (payload["status"], task_id))
+            cursor.execute("UPDATE tasks SET status = %s WHERE id = %s AND user_id = %s", (payload["status"], task_id, session["user_id"]))
             if cursor.rowcount == 0:
                 cursor.close()
                 return response(message="Task not found.", status=404)
             connection.commit()
             cursor.close()
+        log_activity("status_changed", task_id, payload["status"])
         return response(message="Task status updated.")
     except Error:
         current_app.logger.exception("Unable to update task status")
@@ -191,16 +209,19 @@ def update_status(task_id):
 
 
 @tasks_bp.delete("/tasks/<int:task_id>")
+@login_required
+@require_csrf
 def delete_task(task_id):
     try:
         with get_connection() as connection:
             cursor = connection.cursor()
-            cursor.execute("DELETE FROM tasks WHERE id = %s", (task_id,))
+            cursor.execute("DELETE FROM tasks WHERE id = %s AND user_id = %s", (task_id, session["user_id"]))
             if cursor.rowcount == 0:
                 cursor.close()
                 return response(message="Task not found.", status=404)
             connection.commit()
             cursor.close()
+        log_activity("deleted", task_id)
         return response(message="Task deleted.")
     except Error:
         current_app.logger.exception("Unable to delete task")

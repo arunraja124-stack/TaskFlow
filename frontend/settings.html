@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TaskFlow | Settings</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/styles.css" rel="stylesheet">
+</head>
+<body class="settings-page">
+  <aside class="app-sidebar" aria-label="Primary navigation">
+    <a class="sidebar-brand" href="/"><span class="brand-mark">T</span><span>Task<span>Flow</span></span></a>
+    <p class="sidebar-label">Workspace</p>
+    <nav class="sidebar-nav">
+      <a class="sidebar-link" href="/#dashboard"><span class="nav-icon">⌂</span>Dashboard</a>
+      <a class="sidebar-link" href="/#board"><span class="nav-icon">▦</span>My Tasks</a>
+      <a class="sidebar-link" href="/#board"><span class="nav-icon">◫</span>Kanban Board</a>
+      <a class="sidebar-link" href="/#calendarPanel"><span class="nav-icon">□</span>Calendar</a>
+      <a class="sidebar-link" href="/#aiModal"><span class="nav-icon">✦</span>AI Assistant</a>
+      <a class="sidebar-link" href="/#stats"><span class="nav-icon">◔</span>Analytics</a>
+      <a class="sidebar-link" href="/#activityPanel"><span class="nav-icon">▤</span>Reports</a>
+    </nav>
+    <p class="sidebar-label sidebar-label-bottom">Account</p>
+    <a class="sidebar-link active" href="/settings.html" aria-current="page"><span class="nav-icon">⚙</span>Settings</a>
+    <div class="sidebar-user"><span class="avatar" id="sidebarAvatar">A</span><div><strong id="sidebarUserName">Account</strong><small>Personal workspace</small></div></div>
+  </aside>
+  <nav class="navbar app-navbar"><div class="topbar-inner"><button class="mobile-menu" id="mobileMenuButton" aria-label="Open navigation">☰</button><div><p class="topbar-kicker mb-0">Account</p><h1 class="topbar-title mb-0">Settings</h1></div><div class="topbar-actions"><button class="icon-button" id="themeButton" aria-label="Toggle dark mode">☾</button><div class="topbar-profile"><span class="avatar avatar-small">A</span><span id="userName">Account</span></div><button class="btn btn-sm btn-outline-light topbar-logout" id="logoutButton">Log out</button></div></div></nav>
+  <main class="settings-main">
+    <div class="settings-heading"><div><p class="eyebrow mb-1">Account preferences</p><h1>Settings</h1><p class="text-secondary">Manage your profile, workspace preferences, and security.</p></div><a class="btn btn-light" href="/">← Back to dashboard</a></div>
+    <div id="settingsAlert" aria-live="polite"></div>
+    <div class="settings-layout">
+      <section class="settings-content">
+        <form class="settings-card" id="profileForm">
+          <div class="settings-card-heading"><div><span class="section-kicker">Personal details</span><h2>Profile</h2><p>Keep your account information up to date.</p></div><span class="settings-icon">●</span></div>
+          <div class="row g-3"><div class="col-md-6"><label class="form-label" for="profileName">Full name</label><input class="form-control" id="profileName" maxlength="100" required></div><div class="col-md-6"><label class="form-label" for="profileEmail">Email address</label><input class="form-control" id="profileEmail" type="email" maxlength="254" required></div></div>
+          <div class="settings-actions"><span class="form-status" id="profileStatus"></span><button class="btn btn-primary" type="submit" id="profileSave">Save profile</button></div>
+        </form>
+        <form class="settings-card" id="preferencesForm">
+          <div class="settings-card-heading"><div><span class="section-kicker">Workspace behavior</span><h2>Task preferences</h2><p>Choose how TaskFlow opens and creates your tasks.</p></div><span class="settings-icon">✓</span></div>
+          <div class="row g-3"><div class="col-md-6"><label class="form-label" for="defaultView">Default task view</label><select class="form-select" id="defaultView"><option value="dashboard">Dashboard</option><option value="board">Kanban board</option><option value="calendar">Calendar</option></select></div><div class="col-md-6"><label class="form-label" for="defaultPriority">Default priority</label><select class="form-select" id="defaultPriority"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div></div>
+          <div class="settings-actions"><span class="form-status" id="preferencesStatus"></span><button class="btn btn-primary" type="submit" id="preferencesSave">Save preferences</button></div>
+        </form>
+        <form class="settings-card" id="notificationsForm">
+          <div class="settings-card-heading"><div><span class="section-kicker">Stay informed</span><h2>Notifications</h2><p>Choose which task reminders appear in your workspace.</p></div><span class="settings-icon">♢</span></div>
+          <label class="toggle-row"><span><strong>Deadline reminders</strong><small>Show upcoming task due-date reminders.</small></span><input class="form-check-input" id="deadlineReminders" type="checkbox"></label>
+          <label class="toggle-row"><span><strong>Overdue-task alerts</strong><small>Show alerts when active tasks pass their due date.</small></span><input class="form-check-input" id="overdueAlerts" type="checkbox"></label>
+          <div class="settings-actions"><span class="form-status" id="notificationsStatus"></span><button class="btn btn-primary" type="submit" id="notificationsSave">Save notifications</button></div>
+        </form>
+      </section>
+      <aside class="settings-side">
+        <section class="settings-card appearance-card"><div class="settings-card-heading"><div><span class="section-kicker">Interface</span><h2>Appearance</h2><p>Make TaskFlow feel right for your workspace.</p></div><span class="settings-icon">◐</span></div><div class="appearance-choice"><div class="appearance-swatch light-swatch"></div><div><strong>Theme</strong><small id="themeLabel">Light mode</small></div><button type="button" class="btn btn-outline-primary btn-sm" id="appearanceToggle">Switch</button></div></section>
+        <form class="settings-card" id="passwordForm"><div class="settings-card-heading"><div><span class="section-kicker">Account security</span><h2>Change password</h2><p>Use a unique password of at least 8 characters.</p></div><span class="settings-icon">⌁</span></div><label class="form-label" for="currentPassword">Current password</label><input class="form-control mb-3" id="currentPassword" type="password" autocomplete="current-password" required><label class="form-label" for="newPassword">New password</label><input class="form-control mb-3" id="newPassword" type="password" minlength="8" autocomplete="new-password" required><label class="form-label" for="passwordConfirmation">Confirm new password</label><input class="form-control" id="passwordConfirmation" type="password" minlength="8" autocomplete="new-password" required><div class="settings-actions"><span class="form-status" id="passwordStatus"></span><button class="btn btn-primary" type="submit" id="passwordSave">Update password</button></div></form>
+      </aside>
+    </div>
+  </main>
+  <script src="/js/settings.js"></script>
+</body>
+</html>
