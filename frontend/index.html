@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TaskFlow | Team Task Management</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/styles.css" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar navbar-dark app-navbar">
+    <div class="container-fluid px-4"><a class="navbar-brand fw-bold" href="/">Task<span>Flow</span></a><span class="text-white-50 small">Team task management</span></div>
+  </nav>
+  <main class="container-fluid px-3 px-lg-5 py-4">
+    <header class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+      <div><p class="eyebrow mb-1">Workspace overview</p><h1 class="h2 mb-1">Good morning, team.</h1><p class="text-secondary mb-0">Plan clearly. Execute confidently.</p></div>
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#taskModal" id="newTaskButton">+ New task</button>
+    </header>
+    <div id="alertArea" aria-live="polite"></div>
+    <section class="row g-3 mb-4" id="stats">
+      <div class="col-6 col-xl"><div class="stat-card"><span>Total tasks</span><strong id="totalCount">—</strong></div></div>
+      <div class="col-6 col-xl"><div class="stat-card"><span>To do</span><strong id="todoCount">—</strong></div></div>
+      <div class="col-6 col-xl"><div class="stat-card"><span>In progress</span><strong id="progressCount">—</strong></div></div>
+      <div class="col-6 col-xl"><div class="stat-card"><span>Completed</span><strong id="completedCount">—</strong></div></div>
+      <div class="col-12 col-xl"><div class="stat-card"><span>Completion</span><strong id="completionRate">—</strong><div class="progress mt-2"><div id="completionBar" class="progress-bar" role="progressbar"></div></div></div></div>
+    </section>
+    <section class="panel p-3 p-lg-4 mb-4">
+      <div class="row g-2 align-items-center">
+        <div class="col-lg-4"><label class="visually-hidden" for="search">Search tasks</label><input id="search" class="form-control" placeholder="Search by title"></div>
+        <div class="col-6 col-lg-2"><label class="visually-hidden" for="statusFilter">Status</label><select id="statusFilter" class="form-select"><option value="">All statuses</option><option value="todo">To do</option><option value="in_progress">In progress</option><option value="completed">Completed</option></select></div>
+        <div class="col-6 col-lg-2"><label class="visually-hidden" for="priorityFilter">Priority</label><select id="priorityFilter" class="form-select"><option value="">All priorities</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></div>
+        <div class="col-12 col-lg-2"><label class="visually-hidden" for="sort">Sort</label><select id="sort" class="form-select"><option value="created_at">Newest first</option><option value="due_date">Due date</option><option value="priority">Priority</option></select></div>
+        <div class="col-lg-2 text-lg-end"><span class="text-secondary small" id="taskSummary"></span></div>
+      </div>
+    </section>
+    <section class="row g-3" id="board" aria-label="Task board">
+      <div class="col-lg-4"><div class="kanban-column" data-status="todo"><div class="column-heading"><h2>To do</h2><span class="badge rounded-pill" id="todoBadge">0</span></div><div class="task-list" id="todoList"></div></div></div>
+      <div class="col-lg-4"><div class="kanban-column" data-status="in_progress"><div class="column-heading"><h2>In progress</h2><span class="badge rounded-pill" id="progressBadge">0</span></div><div class="task-list" id="progressList"></div></div></div>
+      <div class="col-lg-4"><div class="kanban-column" data-status="completed"><div class="column-heading"><h2>Completed</h2><span class="badge rounded-pill" id="completedBadge">0</span></div><div class="task-list" id="completedList"></div></div></div>
+    </section>
+  </main>
+  <div class="modal fade" id="taskModal" tabindex="-1" aria-labelledby="modalTitle">
+    <div class="modal-dialog"><form class="modal-content" id="taskForm"><div class="modal-header"><h2 class="modal-title fs-5" id="modalTitle">New task</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body"><input type="hidden" id="taskId"><div class="mb-3"><label class="form-label" for="title">Title</label><input class="form-control" id="title" maxlength="160" required><div class="invalid-feedback">Enter a title.</div></div><div class="mb-3"><label class="form-label" for="description">Description</label><textarea class="form-control" id="description" rows="3" maxlength="2000"></textarea></div><div class="row g-3"><div class="col-6"><label class="form-label" for="priority">Priority</label><select class="form-select" id="priority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select></div><div class="col-6"><label class="form-label" for="dueDate">Due date</label><input type="date" class="form-control" id="dueDate"></div></div></div>
+      <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" id="saveButton">Save task</button></div>
+    </form></div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script><script src="/js/app.js"></script>
+</body>
+</html>
