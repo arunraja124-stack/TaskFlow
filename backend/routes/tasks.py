@@ -10,6 +10,7 @@ from backend.security import login_required, require_csrf
 tasks_bp = Blueprint("tasks", __name__)
 VALID_STATUSES = {"todo", "in_progress", "completed"}
 VALID_PRIORITIES = {"low", "medium", "high"}
+VALID_DUE_FILTERS = {"overdue", "today", "upcoming", "no_due"}
 
 
 def log_activity(action, task_id, details=""):
@@ -61,7 +62,7 @@ def parse_payload(payload, partial=False):
     if "due_date" in payload and payload["due_date"]:
         try:
             due = date.fromisoformat(payload["due_date"])
-            if due < date.today():
+            if due < date.today() and payload.get("status") != "completed":
                 return None, "Due date cannot be in the past."
         except (TypeError, ValueError):
             return None, "Due date must use YYYY-MM-DD format."
@@ -79,12 +80,15 @@ def list_tasks():
     query = request.args.get("search", "").strip()
     status = request.args.get("status", "").strip()
     priority = request.args.get("priority", "").strip()
+    due_filter = request.args.get("due_date", "").strip()
     sort = request.args.get("sort", "created_at")
     sort_columns = {"due_date": "due_date", "created_at": "created_at", "priority": "priority"}
     if status and status not in VALID_STATUSES:
         return response(message="Invalid status filter.", status=400)
     if priority and priority not in VALID_PRIORITIES:
         return response(message="Invalid priority filter.", status=400)
+    if due_filter and due_filter not in VALID_DUE_FILTERS:
+        return response(message="Invalid due date filter.", status=400)
     order_column = sort_columns.get(sort, "created_at")
     order = "FIELD(priority, 'high', 'medium', 'low'), created_at DESC" if sort == "priority" else f"{order_column} ASC"
     clauses, values = ["user_id = %s"], [session["user_id"]]
@@ -97,6 +101,14 @@ def list_tasks():
     if priority:
         clauses.append("priority = %s")
         values.append(priority)
+    if due_filter == "overdue":
+        clauses.append("due_date < CURRENT_DATE AND status <> 'completed'")
+    elif due_filter == "today":
+        clauses.append("due_date = CURRENT_DATE")
+    elif due_filter == "upcoming":
+        clauses.append("due_date >= CURRENT_DATE AND due_date <= DATE_ADD(CURRENT_DATE, INTERVAL 7 DAY)")
+    elif due_filter == "no_due":
+        clauses.append("due_date IS NULL")
     sql = f"SELECT id, title, description, status, priority, due_date, created_at, updated_at FROM tasks WHERE {' AND '.join(clauses)} ORDER BY {order}"
     try:
         with get_connection() as connection:

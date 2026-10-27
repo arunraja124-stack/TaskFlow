@@ -26,7 +26,7 @@ def current_user():
     try:
         with get_connection() as connection:
             cursor = connection.cursor(dictionary=True)
-            cursor.execute("SELECT id, name, email FROM users WHERE id = %s", (user_id,))
+            cursor.execute("SELECT id, name, email, role FROM users WHERE id = %s", (user_id,))
             user = cursor.fetchone()
             cursor.close()
         return user

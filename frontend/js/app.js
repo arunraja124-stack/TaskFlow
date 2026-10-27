@@ -1,4 +1,4 @@
-const state = { tasks: [], csrf: "", calendarTasks: [], activity: [], calendarDate: new Date() };
+const state = { tasks: [], csrf: "", calendarTasks: [], activity: [], calendarDate: new Date(), statusUpdate: null };
 const $ = (id) => document.getElementById(id);
 const api = async (url, options = {}) => {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
@@ -10,10 +10,16 @@ const api = async (url, options = {}) => {
   return body;
 };
 const showAlert = (message, type = "success") => { $("alertArea").innerHTML = `<div class="alert alert-${type} alert-dismissible fade show" role="alert">${message}<button class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>`; };
+const setBoardStatus = (message, type = "") => {
+  const status = $("boardStatus");
+  status.textContent = message;
+  status.className = `board-status${type ? ` ${type}` : ""}`;
+};
 const isOverdue = (task) => task.due_date && task.status !== "completed" && new Date(`${task.due_date}T23:59:59`) < new Date();
 const taskCard = (task) => {
   const due = task.due_date ? `<span class="${isOverdue(task) ? "overdue" : "due-label"}">${isOverdue(task) ? "Overdue · " : "Due · "}${task.due_date}</span>` : "";
-  return `<article class="task-card priority-${task.priority}" draggable="true" data-id="${task.id}" tabindex="0"><h3>${escapeHtml(task.title)}</h3><p>${escapeHtml(task.description || "No description")}</p><div class="task-meta"><span class="priority-label">${task.priority}</span>${due}</div><div class="task-actions"><button class="btn btn-outline-secondary edit-task" data-id="${task.id}">Edit</button><button class="btn btn-outline-danger delete-task" data-id="${task.id}">Delete</button><select class="form-select form-select-sm status-select" data-id="${task.id}" aria-label="Change status"><option value="todo" ${task.status === "todo" ? "selected" : ""}>To do</option><option value="in_progress" ${task.status === "in_progress" ? "selected" : ""}>In progress</option><option value="completed" ${task.status === "completed" ? "selected" : ""}>Completed</option></select></div></article>`;
+  const busy = state.statusUpdate === task.id;
+  return `<article class="task-card priority-${task.priority}${busy ? " is-updating" : ""}" draggable="${!busy}" data-id="${task.id}" tabindex="0" aria-busy="${busy}"><h3>${escapeHtml(task.title)}</h3><p>${escapeHtml(task.description || "No description")}</p><div class="task-meta"><span class="priority-label">${task.priority}</span>${due}</div><div class="task-actions"><button class="btn btn-outline-secondary edit-task" data-id="${task.id}"${busy ? " disabled" : ""}>Edit</button><button class="btn btn-outline-danger delete-task" data-id="${task.id}"${busy ? " disabled" : ""}>Delete</button><select class="form-select form-select-sm status-select" data-id="${task.id}" aria-label="Change status for ${escapeHtml(task.title)}"${busy ? " disabled" : ""}><option value="todo" ${task.status === "todo" ? "selected" : ""}>To do</option><option value="in_progress" ${task.status === "in_progress" ? "selected" : ""}>In progress</option><option value="completed" ${task.status === "completed" ? "selected" : ""}>Completed</option></select></div></article>`;
 };
 const escapeHtml = (value) => { const div = document.createElement("div"); div.textContent = value; return div.innerHTML; };
 function render() {
@@ -30,7 +36,54 @@ function render() {
   renderTodayTasks();
   bindTaskEvents();
 }
-async function loadTasks() { try { const params = new URLSearchParams({ search: $("search").value, status: $("statusFilter").value, priority: $("priorityFilter").value, sort: $("sort").value }); const result = await api(`/tasks?${params}`); state.tasks = result.data.tasks; render(); } catch (error) { showAlert(error.message, "danger"); } }
+async function loadTasks() {
+  setBoardStatus("Loading tasks…", "loading");
+  try {
+    const params = new URLSearchParams({ search: $("search").value, status: $("statusFilter").value, priority: $("priorityFilter").value, due_date: $("dueDateFilter").value, sort: $("sort").value });
+    const result = await api(`/tasks?${params}`);
+    state.tasks = result.data.tasks;
+    render();
+    setBoardStatus(`${result.data.count} task${result.data.count === 1 ? "" : "s"} loaded.`);
+  } catch (error) {
+    setBoardStatus("Unable to load tasks.", "error");
+    showAlert(error.message, "danger");
+  }
+}
+async function downloadReport(path, button, successMessage) {
+  const originalLabel = button.textContent;
+  button.disabled = true;
+  button.textContent = "Generating…";
+  try {
+    const params = new URLSearchParams({ search: $("search").value, status: $("statusFilter").value, priority: $("priorityFilter").value, due_date: $("dueDateFilter").value, sort: $("sort").value });
+    const response = await fetch(`/api${path}?${params}`, { credentials: "same-origin" });
+    if (response.status === 401) {
+      window.location.href = "/login.html";
+      return;
+    }
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error?.message || "Unable to generate report.");
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const filename = disposition.match(/filename="?([^"]+)"?/)?.[1] || "taskflow-report";
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    const note = response.headers.get("X-TaskFlow-Report-Note");
+    showAlert(note ? `${successMessage} ${note}` : successMessage, note ? "warning" : "success");
+  } catch (error) {
+    showAlert(error.message, "danger");
+  } finally {
+    button.disabled = false;
+    button.textContent = originalLabel;
+  }
+}
 async function loadAnalytics() { try { const result = await api("/analytics"); const data = result.data; $("overdueCount").textContent = data.overdue; $("weeklyCount").textContent = data.weekly_completed; } catch (error) { showAlert(error.message, "danger"); } }
 async function loadProductivity() {
   try {
@@ -92,23 +145,70 @@ function renderWeeklyChart() {
   const max = Math.max(...counts.map((item) => item.value), 1);
   $("weeklyChart").innerHTML = counts.map((item) => `<div class="chart-column"><span class="chart-value">${item.value || ""}</span><span class="chart-bar ${item.value ? "active" : ""}" style="height:${Math.max(7, Math.round((item.value / max) * 53))}px"></span><span class="chart-day">${item.label}</span></div>`).join("");
 }
+async function changeTaskStatus(id, nextStatus, originalStatus) {
+  if (nextStatus === originalStatus || state.statusUpdate === id) return;
+  const task = state.tasks.find((item) => item.id === id);
+  if (!task) return;
+  task.status = nextStatus;
+  state.statusUpdate = id;
+  render();
+  setBoardStatus("Saving status…", "loading");
+  try {
+    await api(`/tasks/${id}/status`, { method: "PATCH", body: JSON.stringify({ status: nextStatus }) });
+    state.statusUpdate = null;
+    render();
+    setBoardStatus("Status saved.");
+    showAlert("Task status updated.");
+    loadAnalytics();
+    loadProductivity();
+  } catch (error) {
+    task.status = originalStatus;
+    state.statusUpdate = null;
+    render();
+    setBoardStatus("Status could not be saved. The task was restored.", "error");
+    showAlert(error.message, "danger");
+  }
+}
 function bindTaskEvents() {
   document.querySelectorAll(".edit-task").forEach((button) => button.addEventListener("click", () => openEdit(Number(button.dataset.id))));
   document.querySelectorAll(".delete-task").forEach((button) => button.addEventListener("click", async () => { if (!window.confirm("Delete this task? This cannot be undone.")) return; try { await api(`/tasks/${button.dataset.id}`, { method: "DELETE" }); showAlert("Task deleted."); await loadTasks(); } catch (error) { showAlert(error.message, "danger"); } }));
-  document.querySelectorAll(".status-select").forEach((select) => select.addEventListener("change", async () => { try { await api(`/tasks/${select.dataset.id}/status`, { method: "PATCH", body: JSON.stringify({ status: select.value }) }); await loadTasks(); } catch (error) { showAlert(error.message, "danger"); } }));
-  document.querySelectorAll(".task-card").forEach((card) => { card.addEventListener("dragstart", (event) => event.dataTransfer.setData("text/plain", card.dataset.id)); });
+  document.querySelectorAll(".status-select").forEach((select) => select.addEventListener("change", () => {
+    const task = state.tasks.find((item) => item.id === Number(select.dataset.id));
+    changeTaskStatus(Number(select.dataset.id), select.value, task?.status);
+  }));
+  document.querySelectorAll(".task-card").forEach((card) => {
+    card.addEventListener("dragstart", (event) => {
+      if (state.statusUpdate) { event.preventDefault(); return; }
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", card.dataset.id);
+      card.classList.add("is-dragging");
+    });
+    card.addEventListener("dragend", () => card.classList.remove("is-dragging"));
+  });
 }
 function openEdit(id) { const task = state.tasks.find((item) => item.id === id); if (!task) return; $("taskId").value = id; $("title").value = task.title; $("description").value = task.description; $("priority").value = task.priority; $("dueDate").value = task.due_date || ""; $("modalTitle").textContent = "Edit task"; bootstrap.Modal.getOrCreateInstance($("taskModal")).show(); }
 document.addEventListener("DOMContentLoaded", () => {
   document.body.classList.toggle("dark-mode", localStorage.getItem("taskflow-theme") === "dark");
-  fetch("/api/auth/me").then(async (response) => { if (!response.ok) { window.location.href = "/login.html"; return; } const body = await response.json(); const user = body.data.user; const initial = user.name.charAt(0).toUpperCase(); $("userName").textContent = user.name; $("rightUserName").textContent = user.name; $("rightUserEmail").textContent = user.email || "Personal workspace"; $("greetingTitle").textContent = `Hi, ${user.name}`; $("sidebarUserName").textContent = user.name; $("sidebarAvatar").textContent = initial; document.querySelectorAll(".avatar-small,.avatar-large").forEach((avatar) => { avatar.textContent = initial; }); loadTasks(); loadAnalytics(); loadProductivity(); }).catch(() => { window.location.href = "/login.html"; });
+  fetch("/api/auth/me").then(async (response) => { if (!response.ok) { window.location.href = "/login.html"; return; } const body = await response.json(); const user = body.data.user; const initial = user.name.charAt(0).toUpperCase(); if (user.role === "admin") $("adminAttendanceLink").hidden = false; $("userName").textContent = user.name; $("rightUserName").textContent = user.name; $("rightUserEmail").textContent = user.email || "Personal workspace"; $("greetingTitle").textContent = `Hi, ${user.name}`; $("sidebarUserName").textContent = user.name; $("sidebarAvatar").textContent = initial; document.querySelectorAll(".avatar-small,.avatar-large").forEach((avatar) => { avatar.textContent = initial; }); loadTasks(); loadAnalytics(); loadProductivity(); }).catch(() => { window.location.href = "/login.html"; });
   $("globalSearch").addEventListener("input", (event) => { $("search").value = event.target.value; loadTasks(); });
   $("mobileMenuButton").addEventListener("click", () => { document.body.classList.toggle("sidebar-open"); });
   document.querySelectorAll(".sidebar-link").forEach((link) => link.addEventListener("click", () => document.body.classList.remove("sidebar-open")));
-  ["search", "statusFilter", "priorityFilter", "sort"].forEach((id) => $(id).addEventListener(id === "search" ? "input" : "change", loadTasks));
+  ["search", "statusFilter", "priorityFilter", "dueDateFilter", "sort"].forEach((id) => $(id).addEventListener(id === "search" ? "input" : "change", loadTasks));
+  $("exportExcelButton").addEventListener("click", () => downloadReport("/reports/tasks.xlsx", $("exportExcelButton"), "Excel export downloaded."));
+  $("generatePdfButton").addEventListener("click", () => downloadReport("/reports/productivity.pdf", $("generatePdfButton"), "Productivity PDF downloaded."));
   $("newTaskButton").addEventListener("click", () => { $("taskForm").reset(); $("taskId").value = ""; $("modalTitle").textContent = "New task"; });
   $("taskForm").addEventListener("submit", async (event) => { event.preventDefault(); if (!$("taskForm").checkValidity()) { $("taskForm").classList.add("was-validated"); return; } const id = $("taskId").value; const payload = { title: $("title").value.trim(), description: $("description").value, priority: $("priority").value, due_date: $("dueDate").value || null }; $("saveButton").disabled = true; try { await api(id ? `/tasks/${id}` : "/tasks", { method: id ? "PUT" : "POST", body: JSON.stringify(payload) }); bootstrap.Modal.getInstance($("taskModal")).hide(); showAlert(id ? "Task updated." : "Task created."); await loadTasks(); } catch (error) { showAlert(error.message, "danger"); } finally { $("saveButton").disabled = false; } });
-  document.querySelectorAll(".kanban-column").forEach((column) => { column.addEventListener("dragover", (event) => event.preventDefault()); column.addEventListener("drop", async (event) => { event.preventDefault(); const id = event.dataTransfer.getData("text/plain"); try { await api(`/tasks/${id}/status`, { method: "PATCH", body: JSON.stringify({ status: column.dataset.status }) }); await loadTasks(); } catch (error) { showAlert(error.message, "danger"); } }); });
+  document.querySelectorAll(".kanban-column").forEach((column) => {
+    column.addEventListener("dragover", (event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; column.classList.add("drop-target"); });
+    column.addEventListener("dragleave", (event) => { if (!column.contains(event.relatedTarget)) column.classList.remove("drop-target"); });
+    column.addEventListener("drop", (event) => {
+      event.preventDefault();
+      column.classList.remove("drop-target");
+      const id = Number(event.dataTransfer.getData("text/plain"));
+      const task = state.tasks.find((item) => item.id === id);
+      if (task) changeTaskStatus(id, column.dataset.status, task.status);
+    });
+  });
   $("logoutButton").addEventListener("click", async () => { await api("/auth/logout", { method: "POST" }); window.location.href = "/login.html"; });
   $("themeButton").onclick = () => { const dark = !document.body.classList.contains("dark-mode"); document.body.classList.toggle("dark-mode", dark); localStorage.setItem("taskflow-theme", dark ? "dark" : "light"); };
   $("calendarPrev").addEventListener("click", () => { state.calendarDate.setMonth(state.calendarDate.getMonth() - 1); renderMiniCalendar(); });

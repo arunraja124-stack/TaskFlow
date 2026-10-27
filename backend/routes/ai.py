@@ -3,7 +3,7 @@ import time
 
 from flask import Blueprint, current_app, jsonify, request, session
 
-from backend.security import login_required
+from backend.security import login_required, require_csrf
 
 ai_bp = Blueprint("ai", __name__)
 _last_request = {}
@@ -12,6 +12,7 @@ _last_request = {}
 @ai_bp.post("/ai/assist")
 @ai_bp.post("/ai/suggest-tasks")
 @login_required
+@require_csrf
 def assist():
     goal = request.get_json(silent=True)
     if not isinstance(goal, dict):

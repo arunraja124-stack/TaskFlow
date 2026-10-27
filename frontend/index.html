@@ -19,6 +19,8 @@
       <a class="sidebar-link" href="#aiModal" data-bs-toggle="modal"><span class="nav-icon">✦</span>AI Assistant</a>
       <a class="sidebar-link" href="#stats"><span class="nav-icon">◔</span>Analytics</a>
       <a class="sidebar-link" href="#activityPanel"><span class="nav-icon">▤</span>Reports</a>
+      <a class="sidebar-link" href="/attendance.html"><span class="nav-icon">✓</span>Attendance</a>
+      <a class="sidebar-link" id="adminAttendanceLink" href="/admin-attendance.html" hidden><span class="nav-icon">▥</span>Team attendance</a>
     </nav>
     <p class="sidebar-label sidebar-label-bottom">Account</p>
     <a class="sidebar-link" href="/settings.html"><span class="nav-icon">⚙</span>Settings</a>
@@ -76,15 +78,17 @@
         </section>
 
         <section class="legacy-tools panel">
-          <div class="section-heading"><div><span class="section-kicker">Task management</span><h2>All tasks</h2></div><span class="text-secondary small" id="taskSummary"></span></div>
+          <div class="section-heading"><div><span class="section-kicker">Task management</span><h2>All tasks</h2></div><div class="report-actions"><span class="text-secondary small" id="taskSummary"></span><button class="btn btn-outline-primary btn-sm" id="exportExcelButton">Export Excel</button><button class="btn btn-primary btn-sm" id="generatePdfButton">Generate AI PDF Report</button></div></div>
           <div class="filter-row">
             <div class="filter-search"><span aria-hidden="true">⌕</span><label class="visually-hidden" for="search">Search tasks</label><input id="search" class="form-control" placeholder="Search by title"></div>
             <div><label class="visually-hidden" for="statusFilter">Status</label><select id="statusFilter" class="form-select"><option value="">All statuses</option><option value="todo">To do</option><option value="in_progress">In progress</option><option value="completed">Completed</option></select></div>
             <div><label class="visually-hidden" for="priorityFilter">Priority</label><select id="priorityFilter" class="form-select"><option value="">All priorities</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></div>
+            <div><label class="visually-hidden" for="dueDateFilter">Due date</label><select id="dueDateFilter" class="form-select"><option value="">Any due date</option><option value="overdue">Overdue</option><option value="today">Due today</option><option value="upcoming">Due in 7 days</option><option value="no_due">No due date</option></select></div>
             <div><label class="visually-hidden" for="sort">Sort</label><select id="sort" class="form-select"><option value="created_at">Newest first</option><option value="due_date">Due date</option><option value="priority">Priority</option></select></div>
           </div>
         </section>
-        <section class="task-board row g-3" id="board" aria-label="Task board">
+        <section class="task-board row g-3" id="board" aria-label="Task board" aria-describedby="boardStatus">
+          <div class="board-status" id="boardStatus" role="status" aria-live="polite"></div>
           <div class="col-lg-4"><div class="kanban-column" data-status="todo"><div class="column-heading"><h2>To do</h2><span class="badge rounded-pill" id="todoBadge">0</span></div><div class="task-list" id="todoList"></div></div></div>
           <div class="col-lg-4"><div class="kanban-column" data-status="in_progress"><div class="column-heading"><h2>In progress</h2><span class="badge rounded-pill" id="progressBadge">0</span></div><div class="task-list" id="progressList"></div></div></div>
           <div class="col-lg-4"><div class="kanban-column" data-status="completed"><div class="column-heading"><h2>Completed</h2><span class="badge rounded-pill" id="completedBadge">0</span></div><div class="task-list" id="completedList"></div></div></div>
